@@ -105,7 +105,7 @@ module.exports = class MentionCacheFix extends Plugin {
 								!this.getCachedUser(id),
 						);
 
-					if (matches.length == 0) return;
+					if (matches.length == 0) return this.update(message.id);
 
 					for (let id of matches) {
 						await this.fetchUser(id);
