@@ -1,9 +1,5 @@
-/*
- * Copyright (c) 2020 Bowser65
- * Licensed under the Open Software License version 3.0
- */
-
 const {getModule} = require('powercord/webpack');
+const {forceUpdateElement} = require('powercord/util');
 const {inject, uninject} = require('powercord/injector');
 const {Plugin} = require('powercord/entities');
 
@@ -46,6 +42,11 @@ module.exports = class MentionCacheFix extends Plugin {
 		});
 	}
 
+	update(id) {
+		forceUpdateElement(`#chat-messages-${id} .contents-2MsGLg`, true);
+		forceUpdateElement(`#message-accessories-${id} > div`, true);
+	}
+
 	async injectUserMentions() {
 		const SlateMention = await getModule(['UserMention']);
 
@@ -72,41 +73,48 @@ module.exports = class MentionCacheFix extends Plugin {
 		inject('mcf-message', Message, 'default', ([props], res) => {
 			const message = props.childrenMessageContent.props.message;
 
-			document
-				.getElementById(`chat-messages-${message.id}`)
-				?.addEventListener(
-					'mouseenter',
-					async () => {
-						if (this.checkingMessages.has(message.id)) return;
+			const el = document.getElementById(`chat-messages-${message.id}`);
+			if (!el) return res;
 
-						this.checkingMessages.add(message.id);
+			el.addEventListener('mouseleave', async () => {
+				this.checkingMessages.delete(message.id);
+			});
 
-						const content = [message.content];
-						message.embeds.forEach(embed => {
-							content.push(embed.rawDescription || '');
-							if (embed.fields)
-								embed.fields.forEach(field =>
-									content.push(field.rawValue),
-								);
-						});
-						const matches = [
-							...content.join(' ').matchAll(/<@!?(\d+)>/g),
-						]
-							.map(m => m[1])
-							.filter((id, i, arr) => arr.indexOf(id) === i)
-							.filter(id => !this.ignoreUsers.has(id));
+			el.addEventListener(
+				'mouseenter',
+				async () => {
+					if (this.checkingMessages.has(message.id)) return;
+					this.checkingMessages.add(message.id);
 
-						for (let id of matches) {
-							let cachedUser = this.getCachedUser(id);
-							if (!cachedUser) {
-								await this.fetchUser(id);
-							}
-						}
+					const content = [message.content];
+					message.embeds.forEach(embed => {
+						content.push(embed.rawDescription || '');
+						if (embed.fields)
+							embed.fields.forEach(field =>
+								content.push(field.rawValue),
+							);
+					});
+					const matches = [
+						...content.join(' ').matchAll(/<@!?(\d+)>/g),
+					]
+						.map(m => m[1])
+						.filter((id, i, arr) => arr.indexOf(id) === i)
+						.filter(
+							id =>
+								!this.ignoreUsers.has(id) &&
+								!this.getCachedUser(id),
+						);
 
-						this.checkingMessages.remove(message.id);
-					},
-					true,
-				);
+					if (matches.length == 0) return;
+
+					for (let id of matches) {
+						await this.fetchUser(id);
+						this.update(message.id);
+					}
+					this.update(message.id);
+				},
+				true,
+			);
 
 			return res;
 		});
