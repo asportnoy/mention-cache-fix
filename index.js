@@ -42,9 +42,37 @@ module.exports = class MentionCacheFix extends Plugin {
 		});
 	}
 
+	async processMessage(message) {
+		const matches = this.getMatches(message);
+		if (!matches) return;
+
+		for (let id of matches) {
+			await this.fetchUser(id);
+			this.update(message.id);
+		}
+	}
+
 	update(id) {
 		forceUpdateElement(`#chat-messages-${id} .contents-2MsGLg`, true);
 		forceUpdateElement(`#message-accessories-${id} > div`, true);
+	}
+
+	getMatches(message) {
+		const content = [message.content];
+		message.embeds.forEach(embed => {
+			content.push(embed.rawDescription || '');
+			if (embed.fields)
+				embed.fields.forEach(field => content.push(field.rawValue));
+		});
+		const matches = [...content.join(' ').matchAll(/<@!?(\d+)>/g)]
+			.map(m => m[1])
+			.filter((id, i, arr) => arr.indexOf(id) === i);
+
+		if (matches.length == 0) return null;
+
+		return matches.filter(
+			id => !this.ignoreUsers.has(id) && !this.getCachedUser(id),
+		);
 	}
 
 	async injectUserMentions() {
@@ -77,7 +105,10 @@ module.exports = class MentionCacheFix extends Plugin {
 			if (!el) return res;
 
 			el.addEventListener('mouseleave', async () => {
+				if (!this.checkingMessages.has(message.id)) return;
 				this.checkingMessages.delete(message.id);
+
+				this.update(message.id);
 			});
 
 			el.addEventListener(
@@ -86,32 +117,8 @@ module.exports = class MentionCacheFix extends Plugin {
 					if (this.checkingMessages.has(message.id)) return;
 					this.checkingMessages.add(message.id);
 
-					const content = [message.content];
-					message.embeds.forEach(embed => {
-						content.push(embed.rawDescription || '');
-						if (embed.fields)
-							embed.fields.forEach(field =>
-								content.push(field.rawValue),
-							);
-					});
-					const matches = [
-						...content.join(' ').matchAll(/<@!?(\d+)>/g),
-					]
-						.map(m => m[1])
-						.filter((id, i, arr) => arr.indexOf(id) === i)
-						.filter(
-							id =>
-								!this.ignoreUsers.has(id) &&
-								!this.getCachedUser(id),
-						);
-
-					if (matches.length == 0) return this.update(message.id);
-
-					for (let id of matches) {
-						await this.fetchUser(id);
-						this.update(message.id);
-					}
 					this.update(message.id);
+					await this.processMessage(message);
 				},
 				true,
 			);
