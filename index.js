@@ -31,8 +31,9 @@ module.exports = class MentionCacheFix extends Plugin {
 		return this.getUser(id).catch(e => {
 			if (e && e.status == 429 && e.headers?.retry_after)
 				return new Promise(resolve =>
-					setTimeout(parseInt(e.headers.retry_after) * 1000, () =>
-						resolve(this.fetchUser(id)),
+					setTimeout(
+						() => resolve(this.fetchUser(id)),
+						parseInt(e.headers.retry_after) * 1000,
 					),
 				);
 			if (e && e.status == 403) ignoreUsers.add(id);
