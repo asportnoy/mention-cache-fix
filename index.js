@@ -101,6 +101,7 @@ module.exports = class MentionCacheFix extends Plugin {
 
 		inject('mcf-message', Message, 'default', ([props], res) => {
 			const message = props.childrenMessageContent.props.message;
+			if (!message) return res;
 
 			const el = document.getElementById(`chat-messages-${message.id}`);
 			if (!el) return res;
