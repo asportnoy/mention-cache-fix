@@ -55,7 +55,7 @@ module.exports = class MentionCacheFix extends Plugin {
 
 	update(id) {
 		forceUpdateElement(`#chat-messages-${id} .contents-2MsGLg`, true);
-		forceUpdateElement(`#message-accessories-${id} > div`, true);
+		forceUpdateElement(`#message-accessories-${id} > article`, true);
 	}
 
 	getMatches(message) {
