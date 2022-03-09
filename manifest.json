@@ -1,6 +1,6 @@
 {
 	"name": "Mention Cache Fix",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "Fix uncached user mentions including in embeds.",
 	"author": "asportnoy#6969",
 	"license": "MIT",
