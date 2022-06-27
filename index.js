@@ -85,7 +85,7 @@ module.exports = class MentionCacheFix extends Plugin {
 			'UserMention',
 			([{ id }], res) => {
 				let cachedUser = this.getCachedUser(id);
-				if (!cachedUser) {
+				if (!cachedUser && !this.ignoreUsers.has(id)) {
 					this.fetchUser(id);
 				}
 
