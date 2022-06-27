@@ -25,24 +25,21 @@ module.exports = class MentionCacheFix extends Plugin {
 	}
 
 	isCached(id) {
-		let guildId =  this.getGuildId();
-		return this.cachedMembers.has(`${id}-${guildId}`)
-		|| this.cachedMembers.has(`${id}-*`)
-		|| !!this.getMember(guildId, id);
+		let guildId = this.getGuildId();
+		return this.cachedMembers.has(`${id}-${guildId}`) || !!this.getMember(guildId, id);
 	}
 
 	fetchUser(id, retry = false) {
 		if (this.isCached(id)) return;
-		console.log(`START ${id}`);
 		let guildId =  this.getGuildId();
 		let fn = retry ? this.getUser(id) : this.fetchProfile(id, { guildId, withMutualGuilds: false });
 		return fn.then(() => {
-			this.cachedMembers.add(`${id}-${retry ? '*' : guildId}`);
+			this.cachedMembers.add(`${id}-${guildId}`);
 			return;
 		}).catch(e => {
 			if (e && e.status === 429) return true; // Abort if ratelimited
 			else if (e?.status === 403 && !retry) return this.fetchUser(id, true);
-			else this.cachedMembers.add(`${id}-${retry ? '*' : guildId}`);
+			else this.cachedMembers.add(`${id}-${guildId}`);
 
 			return;
 		});
