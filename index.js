@@ -6,11 +6,8 @@ const { Plugin } = require('powercord/entities');
 module.exports = class MentionCacheFix extends Plugin {
 	async startPlugin() {
 		this.checkingMessages = new Set();
-		this.ignoreUsers = new Set();
+		this.cachedMembers = new Set();
 
-		this.getCachedUser = (
-			await getModule(['getCurrentUser', 'getUser'])
-		).getUser;
 		this.fetchProfile = (await getModule(['getUser'])).fetchProfile;
 		this.getMember = (await getModule(['getMember'])).getMember;
 		this.getUser = (await getModule(['getUser'])).getUser;
@@ -27,17 +24,25 @@ module.exports = class MentionCacheFix extends Plugin {
 		uninject('mcf-message');
 	}
 
-	fetchUser(id) {
-		return this.getUser(id).catch(e => {
-			if (e && e.status === 429 && e.headers?.retry_after)
-				return new Promise(resolve =>
-					setTimeout(
-						() => resolve(this.fetchUser(id)),
-						parseInt(e.headers.retry_after) * 1000,
-					),
-				);
-			if (e && e.status === 403) this.ignoreUsers.add(id);
-			if (e && e.status === 404) this.ignoreUsers.add(id);
+	isCached(id) {
+		let guildId =  this.getGuildId();
+		return this.cachedMembers.has(`${id}-${guildId}`)
+		|| this.cachedMembers.has(`${id}-*`)
+		|| !!this.getMember(guildId, id);
+	}
+
+	fetchUser(id, retry = false) {
+		if (this.isCached(id)) return;
+		console.log(`START ${id}`);
+		let guildId =  this.getGuildId();
+		let fn = retry ? this.getUser(id) : this.fetchProfile(id, { guildId, withMutualGuilds: false });
+		return fn.then(() => {
+			this.cachedMembers.add(`${id}-${retry ? '*' : guildId}`);
+			return;
+		}).catch(e => {
+			if (e && e.status === 429) return true; // Abort if ratelimited
+			else if (e?.status === 403 && !retry) return this.fetchUser(id, true);
+			else this.cachedMembers.add(`${id}-${retry ? '*' : guildId}`);
 
 			return;
 		});
@@ -48,8 +53,9 @@ module.exports = class MentionCacheFix extends Plugin {
 		if (!matches) return;
 
 		for (let id of matches) {
-			await this.fetchUser(id);
+			let abort = await this.fetchUser(id);
 			this.update(message.id);
+			if (abort) break;
 		}
 	}
 
@@ -71,9 +77,7 @@ module.exports = class MentionCacheFix extends Plugin {
 
 		if (matches.length === 0) return null;
 
-		return matches.filter(
-			id => !this.ignoreUsers.has(id) && !this.getCachedUser(id),
-		);
+		return matches.filter(id => !this.isCached(id));
 	}
 
 	async injectUserMentions() {
@@ -84,10 +88,7 @@ module.exports = class MentionCacheFix extends Plugin {
 			SlateMention,
 			'UserMention',
 			([{ id }], res) => {
-				let cachedUser = this.getCachedUser(id);
-				if (!cachedUser && !this.ignoreUsers.has(id)) {
-					this.fetchUser(id);
-				}
+				this.fetchUser(id);
 
 				return res;
 			},
