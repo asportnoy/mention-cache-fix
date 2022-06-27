@@ -1,7 +1,7 @@
-const {getModule} = require('powercord/webpack');
-const {forceUpdateElement} = require('powercord/util');
-const {inject, uninject} = require('powercord/injector');
-const {Plugin} = require('powercord/entities');
+const { getModule } = require('powercord/webpack');
+const { forceUpdateElement } = require('powercord/util');
+const { inject, uninject } = require('powercord/injector');
+const { Plugin } = require('powercord/entities');
 
 module.exports = class MentionCacheFix extends Plugin {
 	async startPlugin() {
@@ -29,15 +29,15 @@ module.exports = class MentionCacheFix extends Plugin {
 
 	fetchUser(id) {
 		return this.getUser(id).catch(e => {
-			if (e && e.status == 429 && e.headers?.retry_after)
+			if (e && e.status === 429 && e.headers?.retry_after)
 				return new Promise(resolve =>
 					setTimeout(
 						() => resolve(this.fetchUser(id)),
 						parseInt(e.headers.retry_after) * 1000,
 					),
 				);
-			if (e && e.status == 403) ignoreUsers.add(id);
-			if (e && e.status == 404) ignoreUsers.add(id);
+			if (e && e.status === 403) this.ignoreUsers.add(id);
+			if (e && e.status === 404) this.ignoreUsers.add(id);
 
 			return;
 		});
@@ -69,7 +69,7 @@ module.exports = class MentionCacheFix extends Plugin {
 			.map(m => m[1])
 			.filter((id, i, arr) => arr.indexOf(id) === i);
 
-		if (matches.length == 0) return null;
+		if (matches.length === 0) return null;
 
 		return matches.filter(
 			id => !this.ignoreUsers.has(id) && !this.getCachedUser(id),
@@ -83,7 +83,7 @@ module.exports = class MentionCacheFix extends Plugin {
 			'mcf-slate-user-mentions',
 			SlateMention,
 			'UserMention',
-			([{id}], res) => {
+			([{ id }], res) => {
 				let cachedUser = this.getCachedUser(id);
 				if (!cachedUser) {
 					this.fetchUser(id);
@@ -96,7 +96,7 @@ module.exports = class MentionCacheFix extends Plugin {
 
 	async injectMessage() {
 		const Message = await getModule(
-			m => m.default?.displayName == 'Message',
+			m => m.default?.displayName === 'Message',
 		);
 
 		inject('mcf-message', Message, 'default', ([props], res) => {
