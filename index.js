@@ -80,11 +80,7 @@ module.exports = class MentionCacheFix extends Plugin {
 			if (embed.fields)
 				embed.fields.forEach(field => content.push(field.rawValue));
 		});
-		const matches = this.getIDsFromText(content.join(' '));
-
-		if (matches.length === 0) return null;
-
-		return matches;
+		return this.getIDsFromText(content.join(' '));
 	}
 
 	async injectUserMentions() {
@@ -130,7 +126,6 @@ module.exports = class MentionCacheFix extends Plugin {
 					this.update(message.id);
 
 					const matches = this.getMatches(message);
-					if (!matches) return;
 					this.processMatches(matches, message.id);
 				},
 				true,
