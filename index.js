@@ -62,8 +62,8 @@ module.exports = class MentionCacheFix extends Plugin {
 				forceUpdateElement('.topic-11NuQZ', true);
 				break;
 			default: // Message
-				forceUpdateElement(`#chat-messages-${updateInfo}`, true);
-		}
+				forceUpdateElement(`#chat-messages-${updateInfo} .contents-2MsGLg`, true);
+				forceUpdateElement(`#message-accessories-${updateInfo} > article`, true);		}
 	}
 
 	getIDsFromText(text) {
