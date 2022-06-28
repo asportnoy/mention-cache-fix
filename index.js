@@ -51,8 +51,8 @@ module.exports = class MentionCacheFix extends Plugin {
 	async processMatches(matches, updateInfo) {
 		for (let id of matches) {
 			let abort = await this.fetchUser(id);
-			this.update(updateInfo);
 			if (abort) break;
+			this.update(updateInfo);
 		}
 	}
 
