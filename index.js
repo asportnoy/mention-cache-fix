@@ -14,14 +14,17 @@ module.exports = class MentionCacheFix extends Plugin {
 		this.getGuildId = (
 			await getModule(['getLastSelectedGuildId'])
 		).getGuildId;
+		this.parse = await getModule(['parse', 'parseTopic']);
 
 		this.injectUserMentions();
 		this.injectMessage();
+		this.injectTopic();
 	}
 
 	pluginWillUnload() {
 		uninject('mcf-slate-user-mentions');
 		uninject('mcf-message');
+		uninject('mcf-parsetopic');
 	}
 
 	isCached(id) {
@@ -45,20 +48,29 @@ module.exports = class MentionCacheFix extends Plugin {
 		});
 	}
 
-	async processMessage(message) {
-		const matches = this.getMatches(message);
-		if (!matches) return;
-
+	async processMatches(matches, updateInfo) {
 		for (let id of matches) {
 			let abort = await this.fetchUser(id);
-			this.update(message.id);
+			this.update(updateInfo);
 			if (abort) break;
 		}
 	}
 
-	update(id) {
-		forceUpdateElement(`#chat-messages-${id} .contents-2MsGLg`, true);
-		forceUpdateElement(`#message-accessories-${id} > article`, true);
+	update(updateInfo) {
+		switch (updateInfo) {
+			case 'topic':
+				forceUpdateElement('.topic-11NuQZ', true);
+				break;
+			default: // Message
+				forceUpdateElement(`#chat-messages-${updateInfo}`, true);
+		}
+	}
+
+	getIDsFromText(text) {
+		return [...text.matchAll(/<@!?(\d+)>/g)]
+			.map(m => m[1])
+			.filter((id, i, arr) => arr.indexOf(id) === i)
+			.filter(id => !this.isCached(id));
 	}
 
 	getMatches(message) {
@@ -68,13 +80,11 @@ module.exports = class MentionCacheFix extends Plugin {
 			if (embed.fields)
 				embed.fields.forEach(field => content.push(field.rawValue));
 		});
-		const matches = [...content.join(' ').matchAll(/<@!?(\d+)>/g)]
-			.map(m => m[1])
-			.filter((id, i, arr) => arr.indexOf(id) === i);
+		const matches = this.getIDsFromText(content.join(' '));
 
 		if (matches.length === 0) return null;
 
-		return matches.filter(id => !this.isCached(id));
+		return matches;
 	}
 
 	async injectUserMentions() {
@@ -118,7 +128,10 @@ module.exports = class MentionCacheFix extends Plugin {
 					this.checkingMessages.add(message.id);
 
 					this.update(message.id);
-					await this.processMessage(message);
+
+					const matches = this.getMatches(message);
+					if (!matches) return;
+					this.processMatches(matches, message.id);
 				},
 				true,
 			);
@@ -127,5 +140,13 @@ module.exports = class MentionCacheFix extends Plugin {
 		});
 
 		Message.default.displayName = 'Message';
+	}
+
+	async injectTopic() {
+		inject('mcf-parsetopic', this.parse, 'parseTopic', ([content], res) => {
+			const matches = this.getIDsFromText(content);
+			this.processMatches(matches, 'topic');
+			return res;
+		});
 	}
 };
