@@ -28,16 +28,19 @@ module.exports = class MentionCacheFix extends Plugin {
 	}
 
 	isCached(id) {
-		let guildId = this.getGuildId();
+		const guildId = this.getGuildId();
 		return this.cachedMembers.has(`${id}-${guildId}`) || !!this.getMember(guildId, id);
 	}
 
 	fetchUser(id, retry = false) {
 		if (this.isCached(id)) return;
-		let guildId =  this.getGuildId();
-		let fn = retry ? this.getUser(id) : this.fetchProfile(id, { guildId, withMutualGuilds: false });
+		const guildId =  this.getGuildId();
+		const fn = retry ? this.getUser(id) : this.fetchProfile(id, { guildId, withMutualGuilds: false });
 		return fn
-			.then(() => false)
+			.then(x => {
+				if (!retry && !x.guild_member) this.cachedMembers.add(`${id}-${guildId}`);
+				return false;
+			})
 			.catch(e => {
 				if (e && e.status === 429) return true; // Abort if ratelimited
 				else if (e?.status === 403 && !retry) return this.fetchUser(id, true);
@@ -48,8 +51,8 @@ module.exports = class MentionCacheFix extends Plugin {
 	}
 
 	async processMatches(matches, updateInfo) {
-		for (let id of matches) {
-			let abort = await this.fetchUser(id);
+		for (const id of matches) {
+			const abort = await this.fetchUser(id);
 			if (abort) break;
 			this.update(updateInfo);
 		}
