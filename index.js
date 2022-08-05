@@ -38,7 +38,7 @@ module.exports = class MentionCacheFix extends Plugin {
 		const fn = retry ? this.getUser(id) : this.fetchProfile(id, { guildId, withMutualGuilds: false });
 		return fn
 			.then(x => {
-				if (!retry && !x.guild_member) this.cachedMembers.add(`${id}-${guildId}`);
+				if (retry || !retry && !x.guild_member) this.cachedMembers.add(`${id}-${guildId}`);
 				return false;
 			})
 			.catch(e => {
