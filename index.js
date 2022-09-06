@@ -77,12 +77,17 @@ module.exports = class MentionCacheFix extends Plugin {
 
 	getMatches(message) {
 		const content = [message.content];
+		console.log(content);
 		message.embeds.forEach(embed => {
 			content.push(embed.rawDescription || '');
 			if (embed.fields)
 				embed.fields.forEach(field => content.push(field.rawValue));
 		});
 		return this.getIDsFromText(content.join(' '));
+	}
+
+	getMessageIdentifier(message) {
+		return `${message.id}-${message.editedTimestamp?.unix()}`;
 	}
 
 	async injectUserMentions() {
@@ -113,8 +118,9 @@ module.exports = class MentionCacheFix extends Plugin {
 			if (!el) return res;
 
 			el.addEventListener('mouseleave', async () => {
-				if (!this.checkingMessages.has(message.id)) return;
-				this.checkingMessages.delete(message.id);
+				const identifier = this.getMessageIdentifier(message);
+				if (!this.checkingMessages.has(identifier)) return;
+				this.checkingMessages.delete(identifier);
 
 				this.update(message.id);
 			});
@@ -122,8 +128,9 @@ module.exports = class MentionCacheFix extends Plugin {
 			el.addEventListener(
 				'mouseenter',
 				async () => {
-					if (this.checkingMessages.has(message.id)) return;
-					this.checkingMessages.add(message.id);
+					const identifier = this.getMessageIdentifier(message);
+					if (this.checkingMessages.has(identifier)) return;
+					this.checkingMessages.add(identifier);
 
 					this.update(message.id);
 
