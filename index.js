@@ -77,7 +77,6 @@ module.exports = class MentionCacheFix extends Plugin {
 
 	getMatches(message) {
 		const content = [message.content];
-		console.log(content);
 		message.embeds.forEach(embed => {
 			content.push(embed.rawDescription || '');
 			if (embed.fields)
