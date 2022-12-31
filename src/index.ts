@@ -233,33 +233,39 @@ export async function start(): Promise<void> {
     // @ts-ignore I'm too lazy to type this
     const messages: Message[] = res.props.children.props.messages._array;
 
-    messages.forEach((message) => {
-      const el = document.getElementById(`chat-messages-${message.id}`);
-      if (!el) return res;
+    setTimeout(
+      () =>
+        messages.forEach((message) => {
+          const el = document.getElementById(`chat-messages-${message.id}`);
+          if (!el) return res;
 
-      el.addEventListener("mouseleave", () => {
-        const identifier = getMessageIdentifier(message);
-        if (!checkingMessages.has(identifier)) return;
-        checkingMessages.delete(identifier);
+          el.addEventListener("mouseleave", () => {
+            const identifier = getMessageIdentifier(message);
+            if (!checkingMessages.has(identifier)) return;
+            checkingMessages.delete(identifier);
 
-        update(message.id);
-      });
+            update(message.id);
+          });
 
-      el.addEventListener(
-        "mouseenter",
-        () => {
-          const identifier = getMessageIdentifier(message);
-          if (checkingMessages.has(identifier)) return;
-          checkingMessages.add(identifier);
+          el.addEventListener(
+            "mouseenter",
+            () => {
+              const identifier = getMessageIdentifier(message);
+              if (checkingMessages.has(identifier)) return;
+              checkingMessages.add(identifier);
 
-          update(message.id);
+              update(message.id);
 
-          const matches = getMatches(message);
-          void processMatches(matches, message.id);
-        },
-        true,
-      );
-    });
+              const matches = getMatches(message);
+              void processMatches(matches, message.id).then(() =>
+                checkingMessages.delete(identifier),
+              );
+            },
+            true,
+          );
+        }),
+      0,
+    );
   });
 }
 
