@@ -7,7 +7,7 @@
     "discordID": "489484338514100234",
     "github": "asportnoy"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "updater": {
     "type": "github",
     "id": "asportnoy/mention-cache-fix"
