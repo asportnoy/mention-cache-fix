@@ -9,4 +9,4 @@ Due to rate limits, this will only be triggered when you hover on a message.
 
 ## Demo
 
-![Demo](https://i.imgur.com/DZ0YFRe.gif)
+![Demo](https://i.imgur.com/DF3z6GQ.gif)
