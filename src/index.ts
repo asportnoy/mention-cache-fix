@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { GuildMember, Message, User } from "discord-types/general";
+import { Channel, GuildMember, Message, User } from "discord-types/general";
 import type React from "react";
 import { Injector, common, logger, util, webpack } from "replugged";
 
@@ -61,6 +61,8 @@ const { getGuildId } = common.guilds;
 let getMember: GetMember["getTrueMember"];
 let getUser: UserMod["getUser"];
 let api: APIMod;
+let topicClass: string;
+let messageContentClass: string;
 
 const cachedMembers = new Set<string>();
 const checkingMessages = new Set<string>();
@@ -120,6 +122,7 @@ async function fetchMember(id: string, guild_id: string): Promise<Profile> {
 }
 
 function fetchProfile(id: string, retry = false): void | Promise<boolean | void> {
+  console.log("FETCH", id);
   const guildId = getGuildId();
   if (!guildId) return;
   if (isCached(id, retry)) {
@@ -162,10 +165,10 @@ async function processMatches(matches: string[], updateInfo: "topic" | string): 
 function update(updateInfo: "topic" | string): void {
   switch (updateInfo) {
     case "topic":
-      forceUpdateElement(".topic-11NuQZ", true);
+      forceUpdateElement(`.${topicClass}`, true);
       break;
     default: // Message
-      forceUpdateElement(`#chat-messages-${updateInfo} .contents-2MsGLg`, true);
+      forceUpdateElement(`#chat-messages-${updateInfo} .${messageContentClass}`, true);
       forceUpdateElement(`#message-accessories-${updateInfo} > article`, true);
   }
 }
@@ -210,7 +213,7 @@ export async function start(): Promise<void> {
   const messageComponent = (await webpack.waitForModule(
     webpack.filters.bySource(".content.id)"),
   )) as React.FC & {
-    type: (props: Record<string, unknown>) => React.FC;
+    type: (props: Record<string, unknown> & { channel: Channel }) => React.FC;
   };
   if (!messageComponent) {
     throw new Error("Failed to find message component");
@@ -228,10 +231,36 @@ export async function start(): Promise<void> {
     throw new Error("Failed to find api mod");
   }
 
-  inject.after(messageComponent, "type", (_args, res) => {
+  const topicClassMod = await webpack.waitForModule<{ topic: string }>(
+    webpack.filters.byProps("topic", "topicClickTarget"),
+  );
+  if (!topicClassMod) {
+    throw new Error("Failed to find topic class mod");
+  }
+  topicClass = topicClassMod.topic;
+
+  const messageContentClassMod = await webpack.waitForModule<{ contents: string }>(
+    webpack.filters.byProps("contents", "messageContent"),
+  );
+  if (!messageContentClassMod) {
+    throw new Error("Failed to find message content class mod");
+  }
+  messageContentClass = messageContentClassMod.contents;
+
+  inject.after(messageComponent, "type", ([{ channel }], res) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment, @typescript-eslint/prefer-ts-expect-error
     // @ts-ignore I'm too lazy to type this
     const messages: Message[] = res.props.children.props.messages._array;
+
+    const topicIdentifier = `${channel.id}-${channel.topic}`;
+    if (!checkingMessages.has(topicIdentifier)) {
+      checkingMessages.add(topicIdentifier);
+
+      update("topic");
+
+      const matches = getIDsFromText(channel.topic);
+      void processMatches(matches, "topic").then(() => checkingMessages.delete(topicIdentifier));
+    }
 
     setTimeout(
       () =>
