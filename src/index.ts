@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Channel, GuildMember, Message, User } from "discord-types/general";
 import type React from "react";
-import { Injector, common, logger, util, webpack } from "replugged";
+import { Injector, Logger, common, util, webpack } from "replugged";
 
 const inject = new Injector();
+const logger = Logger.plugin("MentionCacheFix");
 
 type GetMember = Record<string, unknown> & {
   getTrueMember: (guildId: string, userId: string) => GuildMember;
@@ -139,12 +140,7 @@ function fetchProfile(id: string, retry = false): void | Promise<boolean | void>
     .catch((e) => {
       if (e && e.status === 429) {
         // Abort if rate limited
-        logger.error(
-          "MentionCacheFix",
-          "Fetching",
-          undefined,
-          `Aborted while fetching user ${id} due to rate limit`,
-        );
+        logger.error(`Aborted while fetching user ${id} due to rate limit`);
         return true;
       } else if (e && e.status === 403 && !retry) {
         return fetchProfile(id, true);
