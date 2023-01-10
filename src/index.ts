@@ -123,8 +123,6 @@ async function fetchMember(id: string, guild_id: string): Promise<Profile> {
 }
 
 function fetchProfile(id: string, retry = false): void | Promise<boolean | void> {
-  console.log("FETCH", id);
-  const guildId = getGuildId();
   if (!guildId) return;
   if (isCached(id, retry)) {
     cachedMembers.add(`${id}-${guildId}`);
