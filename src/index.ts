@@ -3,17 +3,15 @@ import { Channel, GuildMember, Message, User } from "discord-types/general";
 import type React from "react";
 import { Injector, Logger, common, util, webpack } from "replugged";
 
+const { forceUpdateElement } = util;
+const {
+  guilds: { getGuildId },
+  users: { getUser, getTrueMember },
+  api,
+} = common;
+
 const inject = new Injector();
 const logger = Logger.plugin("MentionCacheFix");
-
-type GetMember = Record<string, unknown> & {
-  getTrueMember: (guildId: string, userId: string) => GuildMember;
-};
-
-type UserMod = Record<string, unknown> & {
-  getUser: (userId: string) => User | undefined;
-  getCurrentUser: () => User;
-};
 
 interface Profile {
   connected_accounts?: Array<{
@@ -35,33 +33,6 @@ interface Profile {
   };
 }
 
-type APIMod = Record<
-  "get" | "patch" | "post" | "put" | "delete",
-  <T = Record<string, unknown>>(req: {
-    url: string;
-    query?: Record<string, string>;
-    body?: Record<string, unknown>;
-    headers?: Record<string, string>;
-  }) => Promise<{
-    body: T;
-    status: number;
-    headers: Record<string, string>;
-    ok: boolean;
-    text: string;
-  }>
-> & {
-  getAPIBaseURL: () => string;
-};
-
-// todo: remove once typed correctly
-type Dispatcher = Record<string, unknown> & {
-  dispatch: (action: Record<string, unknown> & { type: string }) => void;
-};
-
-const { getGuildId } = common.guilds;
-let getMember: GetMember["getTrueMember"];
-let getUser: UserMod["getUser"];
-let api: APIMod;
 let topicClass: string;
 let messageContentClass: string;
 
@@ -73,22 +44,9 @@ function isCached(id: string, noGuild = false): boolean {
   if (!guildId) return true;
   if (noGuild) {
     if (getUser(id)) return true;
-  } else if (getMember(guildId, id)) return true;
+  } else if (getTrueMember(guildId, id)) return true;
 
   return cachedMembers.has(`${id}-${guildId}`);
-}
-
-function forceUpdateElement(query: string, all = false): void {
-  const elements = (
-    all ? [...document.querySelectorAll(query)] : [document.querySelector(query)]
-  ).filter(Boolean) as Element[];
-  elements.forEach((element) => {
-    (
-      util.getOwnerInstance(element) as
-        | (Record<string, unknown> & { forceUpdate: () => void })
-        | null
-    )?.forceUpdate();
-  });
 }
 
 async function fetchUser(id: string): Promise<{ user: User }> {
@@ -96,7 +54,7 @@ async function fetchUser(id: string): Promise<{ user: User }> {
     url: `/users/${id}`,
   });
   const { body } = res;
-  (common.fluxDispatcher as Dispatcher).dispatch({ type: "USER_UPDATE", user: body });
+  common.fluxDispatcher.dispatch({ type: "USER_UPDATE", user: body });
   return { user: body };
 }
 
@@ -110,9 +68,9 @@ async function fetchMember(id: string, guild_id: string): Promise<Profile> {
     },
   });
   const { body } = res;
-  (common.fluxDispatcher as Dispatcher).dispatch({ type: "USER_UPDATE", user: body.user });
+  common.fluxDispatcher.dispatch({ type: "USER_UPDATE", user: body.user });
   if (body.guild_member) {
-    (common.fluxDispatcher as Dispatcher).dispatch({
+    common.fluxDispatcher.dispatch({
       type: "GUILD_MEMBER_PROFILE_UPDATE",
       guildId: guild_id,
       guildMember: body.guild_member,
@@ -123,6 +81,7 @@ async function fetchMember(id: string, guild_id: string): Promise<Profile> {
 }
 
 function fetchProfile(id: string, retry = false): void | Promise<boolean | void> {
+  const guildId = getGuildId();
   if (!guildId) return;
   if (isCached(id, retry)) {
     cachedMembers.add(`${id}-${guildId}`);
@@ -191,19 +150,6 @@ function getMessageIdentifier(message: Message): string {
 }
 
 export async function start(): Promise<void> {
-  const getMemberModRaw = await webpack.waitForModule(
-    webpack.filters.byProps("getTrueMember", "getMember"),
-  );
-  const getMemberMod = webpack.getExportsForProps<"getTrueMember", GetMember>(getMemberModRaw, [
-    "getTrueMember",
-  ])!;
-  getMember = getMemberMod.getTrueMember;
-
-  const userMod = await webpack.waitForModule<UserMod>(
-    webpack.filters.byProps("getUser", "getCurrentUser"),
-  );
-  getUser = userMod.getUser;
-
   const messageComponent = (await webpack.waitForModule(
     webpack.filters.bySource(".content.id)"),
   )) as React.FC & {
@@ -211,18 +157,6 @@ export async function start(): Promise<void> {
   };
   if (!messageComponent) {
     throw new Error("Failed to find message component");
-  }
-
-  api = webpack.getByProps<keyof APIMod, APIMod>(
-    "getAPIBaseURL",
-    "get",
-    "patch",
-    "post",
-    "put",
-    "delete",
-  )!;
-  if (!api) {
-    throw new Error("Failed to find api mod");
   }
 
   const topicClassMod = await webpack.waitForModule<{ topic: string }>(
@@ -259,7 +193,7 @@ export async function start(): Promise<void> {
     setTimeout(
       () =>
         messages.forEach((message) => {
-          const el = document.getElementById(`chat-messages-${message.id}`);
+          const el = document.getElementById(`chat-messages-${message.channel_id}-${message.id}`);
           if (!el) return res;
 
           el.addEventListener("mouseleave", () => {
