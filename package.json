@@ -6,15 +6,14 @@
     "node": ">=14.0.0"
   },
   "scripts": {
-    "build": "tsx scripts/build.ts",
-    "watch": "tsx scripts/build.ts --watch",
-    "bundle": "tsx scripts/bundle.ts",
-    "build-and-bundle": "pnpm run build --no-install && pnpm run bundle",
+    "build": "replugged build plugin",
+    "watch": "replugged build plugin --watch",
+    "bundle": "replugged bundle plugin",
     "check": "tsc --noEmit",
-    "prettier:check": "prettier ./src ./scripts --check",
-    "eslint:check": "eslint ./src ./scripts",
-    "prettier:fix": "prettier ./src ./scripts --write",
-    "eslint:fix": "eslint ./src ./scripts --fix",
+    "prettier:check": "prettier ./src --check",
+    "eslint:check": "eslint ./src",
+    "prettier:fix": "prettier ./src --write",
+    "eslint:fix": "eslint ./src --fix",
     "lint": "pnpm run prettier:check && pnpm run eslint:check && pnpm run check",
     "lint:fix": "pnpm run prettier:fix && pnpm run eslint:fix"
   },
