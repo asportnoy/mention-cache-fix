@@ -14,7 +14,9 @@
     "prettier:check": "prettier ./src ./scripts --check",
     "eslint:check": "eslint ./src ./scripts",
     "prettier:fix": "prettier ./src ./scripts --write",
-    "eslint:fix": "eslint ./src ./scripts --fix"
+    "eslint:fix": "eslint ./src ./scripts --fix",
+    "lint": "pnpm run prettier:check && pnpm run eslint:check && pnpm run check",
+    "lint:fix": "pnpm run prettier:fix && pnpm run eslint:fix"
   },
   "keywords": [],
   "author": "",
