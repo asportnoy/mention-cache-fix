@@ -150,10 +150,12 @@ function getMessageIdentifier(message: Message): string {
 }
 
 export async function start(): Promise<void> {
-  const messageComponent = (await webpack.waitForModule(
-    webpack.filters.bySource(".content.id)"),
-  )) as React.FC & {
-    type: (props: Record<string, unknown> & { channel: Channel }) => React.FC;
+  const messageComponent = (
+    await webpack.waitForModule(webpack.filters.bySource(".content.id)"), { raw: true })
+  ).exports as {
+    Z: React.FC & {
+      type: (props: Record<string, unknown> & { channel: Channel }) => React.FC;
+    };
   };
   if (!messageComponent) {
     throw new Error("Failed to find message component");
@@ -175,7 +177,7 @@ export async function start(): Promise<void> {
   }
   messageContentClass = messageContentClassMod.contents;
 
-  inject.after(messageComponent, "type", ([{ channel }], res) => {
+  inject.after(messageComponent.Z, "type", ([{ channel }], res) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment, @typescript-eslint/prefer-ts-expect-error
     // @ts-ignore I'm too lazy to type this
     const messages: Message[] = res.props.children.props.messages._array;
