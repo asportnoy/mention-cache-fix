@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A plugin template",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   },
   "scripts": {
     "build": "replugged build plugin",
