@@ -9,8 +9,8 @@
   },
   "version": "1.1.2",
   "updater": {
-    "type": "github",
-    "id": "asportnoy/mention-cache-fix"
+    "type": "store",
+    "id": "dev.albertp.MentionCacheFix"
   },
   "license": "MIT",
   "type": "replugged-plugin",
