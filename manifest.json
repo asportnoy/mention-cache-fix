@@ -14,5 +14,7 @@
   },
   "license": "MIT",
   "type": "replugged-plugin",
-  "renderer": "src/index.ts"
+  "renderer": "src/index.ts",
+  "source": "https://github.com/asportnoy/mention-cache-fix",
+  "image": "https://i.imgur.com/mqkP51c.gif"
 }
