@@ -1,14 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Channel, GuildMember, Message, User } from "discord-types/general";
 import type React from "react";
-import { Injector, Logger, common, util, webpack } from "replugged";
-
-const { forceUpdateElement } = util;
-const {
-  guilds: { getGuildId },
-  users: { getUser, getTrueMember },
-  api,
-} = common;
+import { Injector, Logger } from "replugged";
+import { filters, waitForModule, waitForProps } from "replugged/webpack";
+import { api, fluxDispatcher, guilds, users } from "replugged/common";
+import { forceUpdateElement } from "replugged/util";
 
 const inject = new Injector();
 const logger = Logger.plugin("MentionCacheFix");
@@ -40,11 +36,11 @@ const cachedMembers = new Set<string>();
 const checkingMessages = new Set<string>();
 
 function isCached(id: string, noGuild = false): boolean {
-  const guildId = getGuildId();
+  const guildId = guilds.getGuildId();
   if (!guildId) return true;
   if (noGuild) {
-    if (getUser(id)) return true;
-  } else if (getTrueMember(guildId, id)) return true;
+    if (users.getUser(id)) return true;
+  } else if (users.getTrueMember(guildId, id)) return true;
 
   return cachedMembers.has(`${id}-${guildId}`);
 }
@@ -54,7 +50,7 @@ async function fetchUser(id: string): Promise<{ user: User }> {
     url: `/users/${id}`,
   });
   const { body } = res;
-  common.fluxDispatcher.dispatch({ type: "USER_UPDATE", user: body });
+  fluxDispatcher.dispatch({ type: "USER_UPDATE", user: body });
   return { user: body };
 }
 
@@ -68,9 +64,9 @@ async function fetchMember(id: string, guild_id: string): Promise<Profile> {
     },
   });
   const { body } = res;
-  common.fluxDispatcher.dispatch({ type: "USER_UPDATE", user: body.user });
+  fluxDispatcher.dispatch({ type: "USER_UPDATE", user: body.user });
   if (body.guild_member) {
-    common.fluxDispatcher.dispatch({
+    fluxDispatcher.dispatch({
       type: "GUILD_MEMBER_PROFILE_UPDATE",
       guildId: guild_id,
       guildMember: body.guild_member,
@@ -81,7 +77,7 @@ async function fetchMember(id: string, guild_id: string): Promise<Profile> {
 }
 
 function fetchProfile(id: string, retry = false): void | Promise<boolean | void> {
-  const guildId = getGuildId();
+  const guildId = guilds.getGuildId();
   if (!guildId) return;
   if (isCached(id, retry)) {
     cachedMembers.add(`${id}-${guildId}`);
@@ -91,7 +87,7 @@ function fetchProfile(id: string, retry = false): void | Promise<boolean | void>
 
   return fn
     .then((x) => {
-      if (retry || (!retry && !("guild_member" in x))) cachedMembers.add(`${id}-${guildId}`);
+      if (retry || !("guild_member" in x)) cachedMembers.add(`${id}-${guildId}`);
       return false;
     })
     .catch((e) => {
@@ -137,6 +133,7 @@ function getMatches(message: Message): string[] {
   const content: string[] = [message.content];
   message.embeds.forEach((embed) => {
     content.push(embed.rawDescription || "");
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (embed.fields)
       (embed.fields as Array<Record<string, unknown> & { rawValue: string }>).forEach((field) =>
         content.push(field.rawValue),
@@ -146,39 +143,86 @@ function getMatches(message: Message): string[] {
 }
 
 function getMessageIdentifier(message: Message): string {
-  return `${message.id}-${message.editedTimestamp?.unix()}`;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const timestamp = message.editedTimestamp ?? message.timestamp;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!timestamp) console.log(message);
+
+  return `${message.id}-${timestamp.unix()}`;
 }
 
 export async function start(): Promise<void> {
-  const messageComponent = (await webpack.waitForModule(
-    webpack.filters.bySource(".content.id)"),
-  )) as React.FC & {
-    type: (props: Record<string, unknown> & { channel: Channel }) => React.FC;
-  };
-  if (!messageComponent) {
-    throw new Error("Failed to find message component");
-  }
+  const messageComponent = await waitForModule<{
+    exports: {
+      default: (
+        props: React.HTMLAttributes<HTMLDivElement> & {
+          childrenMessageContent?: { props: { message?: Message } };
+          messageRef?: { current?: HTMLDivElement };
+        },
+      ) => React.FC;
+    };
+  }>(filters.bySource(/childrenMessageContent:\w,childrenAccessories:\w,/), { raw: true });
 
-  const topicClassMod = await webpack.waitForModule<{ topic: string }>(
-    webpack.filters.byProps("topic", "topicClickTarget"),
+  const topicComponent = await waitForModule<
+    React.Component & {
+      prototype: {
+        render: (this: {
+          props: {
+            channel: Channel;
+          };
+        }) => React.ReactElement;
+      };
+    }
+  >(filters.bySource(/null==\w.topic/));
+
+  const topicClassMod = await waitForProps<{ topic: string; topicClickTarget: string }>(
+    "topic",
+    "topicClickTarget",
   );
-  if (!topicClassMod) {
-    throw new Error("Failed to find topic class mod");
-  }
   topicClass = topicClassMod.topic;
 
-  const messageContentClassMod = await webpack.waitForModule<{ contents: string }>(
-    webpack.filters.byProps("contents", "messageContent"),
-  );
-  if (!messageContentClassMod) {
-    throw new Error("Failed to find message content class mod");
-  }
+  const messageContentClassMod = await waitForProps<{
+    contents: string;
+    messageContent: string;
+  }>("contents", "messageContent");
   messageContentClass = messageContentClassMod.contents;
 
-  inject.after(messageComponent, "type", ([{ channel }], res) => {
+  inject.before(messageComponent.exports, "default", ([props]) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment, @typescript-eslint/prefer-ts-expect-error
     // @ts-ignore I'm too lazy to type this
-    const messages: Message[] = res.props.children.props.messages._array;
+    const message = props.childrenMessageContent?.props.message;
+    if (!message) return;
+    const el = props.messageRef?.current;
+    if (!el) return;
+
+    const { onMouseEnter: originalOnMouseEnter, onMouseLeave: originalOnMouseLeave } = props;
+
+    props.onMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+      originalOnMouseEnter?.(e);
+
+      const identifier = getMessageIdentifier(message);
+      if (checkingMessages.has(identifier)) return;
+      checkingMessages.add(identifier);
+
+      update(message.id);
+
+      const matches = getMatches(message);
+      void processMatches(matches, message.id).then(() => checkingMessages.delete(identifier));
+    };
+
+    props.onMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+      originalOnMouseLeave?.(e);
+
+      const identifier = getMessageIdentifier(message);
+      if (!checkingMessages.has(identifier)) return;
+      checkingMessages.delete(identifier);
+
+      update(message.id);
+    };
+  });
+
+  inject.after(topicComponent.prototype, "render", (_props, _res, self) => {
+    const { channel } = self.props as { channel: Channel };
 
     const topicIdentifier = `${channel.id}-${channel.topic}`;
     if (!checkingMessages.has(topicIdentifier)) {
@@ -189,40 +233,6 @@ export async function start(): Promise<void> {
       const matches = getIDsFromText(channel.topic);
       void processMatches(matches, "topic").then(() => checkingMessages.delete(topicIdentifier));
     }
-
-    setTimeout(
-      () =>
-        messages.forEach((message) => {
-          const el = document.getElementById(`chat-messages-${message.channel_id}-${message.id}`);
-          if (!el) return res;
-
-          el.addEventListener("mouseleave", () => {
-            const identifier = getMessageIdentifier(message);
-            if (!checkingMessages.has(identifier)) return;
-            checkingMessages.delete(identifier);
-
-            update(message.id);
-          });
-
-          el.addEventListener(
-            "mouseenter",
-            () => {
-              const identifier = getMessageIdentifier(message);
-              if (checkingMessages.has(identifier)) return;
-              checkingMessages.add(identifier);
-
-              update(message.id);
-
-              const matches = getMatches(message);
-              void processMatches(matches, message.id).then(() =>
-                checkingMessages.delete(identifier),
-              );
-            },
-            true,
-          );
-        }),
-      0,
-    );
   });
 }
 
