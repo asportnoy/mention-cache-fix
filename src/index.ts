@@ -143,12 +143,13 @@ function getMatches(message: Message): string[] {
 }
 
 function getMessageIdentifier(message: Message): string {
+  // @ts-expect-error This is no longer a moment instance
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const timestamp = message.editedTimestamp ?? message.timestamp;
+  const timestamp: Date = message.editedTimestamp ?? message.timestamp;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!timestamp) console.log(message);
 
-  return `${message.id}-${timestamp.unix()}`;
+  return `${message.id}-${Math.floor(timestamp.getTime() / 1000)}`;
 }
 
 export async function start(): Promise<void> {
