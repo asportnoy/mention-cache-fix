@@ -143,6 +143,7 @@ function getMatches(message: Message): string[] {
 }
 
 function getMessageIdentifier(message: Message): string {
+  // @ts-expect-error This is no longer a moment instance
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const timestamp: Date = message.editedTimestamp ?? message.timestamp;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
