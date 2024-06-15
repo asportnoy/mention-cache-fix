@@ -7,7 +7,7 @@
     "discordID": "489484338514100234",
     "github": "asportnoy"
   },
-  "version": "1.1.6",
+  "version": "1.1.7",
   "updater": {
     "type": "store",
     "id": "dev.albertp.MentionCacheFix"
