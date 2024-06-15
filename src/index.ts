@@ -46,7 +46,7 @@ function isCached(id: string, noGuild = false): boolean {
 }
 
 async function fetchUser(id: string): Promise<{ user: User }> {
-  const res = await api.get<User>({
+  const res = await api.HTTP.get<User>({
     url: `/users/${id}`,
   });
   const { body } = res;
@@ -55,7 +55,7 @@ async function fetchUser(id: string): Promise<{ user: User }> {
 }
 
 async function fetchMember(id: string, guild_id: string): Promise<Profile> {
-  const res = await api.get<Profile>({
+  const res = await api.HTTP.get<Profile>({
     url: `/users/${id}/profile`,
     query: {
       with_mutual_friends_count: "false",
@@ -139,6 +139,7 @@ function getMatches(message: Message): string[] {
         content.push(field.rawValue),
       );
   });
+
   return getIDsFromText(content.join(" "));
 }
 
@@ -191,6 +192,7 @@ export async function start(): Promise<void> {
   inject.before(messageComponent.exports, "default", ([props]) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment, @typescript-eslint/prefer-ts-expect-error
     // @ts-ignore I'm too lazy to type this
+
     const message = props.childrenMessageContent?.props.message;
     if (!message) return;
     const el = props.messageRef?.current;
