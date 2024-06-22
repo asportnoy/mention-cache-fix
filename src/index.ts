@@ -95,7 +95,7 @@ function fetchProfile(id: string, retry = false): void | Promise<boolean | void>
         // Abort if rate limited
         logger.error(`Aborted while fetching user ${id} due to rate limit`);
         return true;
-      } else if (e && e.status === 403 && !retry) {
+      } else if (e && [403, 404].includes(e.status) && !retry) {
         return fetchProfile(id, true);
       } else {
         cachedMembers.add(`${id}-${guildId}`);
@@ -156,7 +156,7 @@ function getMessageIdentifier(message: Message): string {
 export async function start(): Promise<void> {
   const messageComponent = await waitForModule<{
     exports: {
-      default: (
+      Z: (
         props: React.HTMLAttributes<HTMLDivElement> & {
           childrenMessageContent?: { props: { message?: Message } };
           messageRef?: { current?: HTMLDivElement };
@@ -189,7 +189,7 @@ export async function start(): Promise<void> {
   }>("contents", "messageContent");
   messageContentClass = messageContentClassMod.contents;
 
-  inject.before(messageComponent.exports, "default", ([props]) => {
+  inject.before(messageComponent.exports, "Z", ([props]) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment, @typescript-eslint/prefer-ts-expect-error
     // @ts-ignore I'm too lazy to type this
 
