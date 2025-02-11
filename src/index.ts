@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { Channel, GuildMember, Message, User } from "discord-types/general";
+import type { Channel, GuildMember, Message, User } from "discord-types/general";
 import type React from "react";
 import { Injector, Logger } from "replugged";
-import { filters, waitForModule, waitForProps } from "replugged/webpack";
 import { api, fluxDispatcher, guilds, users } from "replugged/common";
 import { forceUpdateElement } from "replugged/util";
+import { filters, waitForModule, waitForProps } from "replugged/webpack";
 
 const inject = new Injector();
 const logger = Logger.plugin("MentionCacheFix");
@@ -114,7 +114,7 @@ async function processMatches(matches: string[], updateInfo: "topic" | string): 
 function update(updateInfo: "topic" | string): void {
   switch (updateInfo) {
     case "topic":
-      forceUpdateElement(`.${topicClass}`, true);
+      forceUpdateElement(`.${topicClass.replace(/\s/, " .").replace("/", "\\/")}`, true);
       break;
     default: // Message
       forceUpdateElement(`#chat-messages-${updateInfo} .${messageContentClass}`, true);
@@ -175,7 +175,7 @@ export async function start(): Promise<void> {
         }) => React.ReactElement;
       };
     }
-  >(filters.bySource(/null==\w.topic/));
+  >(filters.bySource(/this\.handleOpenTopic\(/));
 
   const topicClassMod = await waitForProps<{ topic: string; topicClickTarget: string }>(
     "topic",
